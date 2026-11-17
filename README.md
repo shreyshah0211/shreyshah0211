@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/moon-dark.gif">
-  <img src="./assets/moon-light.gif" width="160" alt="A small dithered moon turning, with a one-pixel satellite in orbit">
+  <img src="./assets/moon-light.gif" width="416" alt="A small dithered moon turning among twinkling pixel stars, with a one-pixel satellite in orbit and the odd shooting star">
 </picture>
 
 # Shrey Shah
