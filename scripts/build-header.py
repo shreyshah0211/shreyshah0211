@@ -1,4 +1,4 @@
-"""Renders assets/moon-{light,dark}.gif: a small cratered moon turning once per
+"""Renders assets/sky-{light,dark}.gif: a small cratered moon turning once per
 loop, lit from the side, Bayer-dithered to 1-bit pixels. A one-pixel satellite
 orbits with a short trail, a few pixel stars flare into crosses, and one shooting
 star crosses per loop. No text. Loops seamlessly.
@@ -137,6 +137,6 @@ def save(path, fg):
 
 out = Path(__file__).resolve().parent.parent / 'assets'
 out.mkdir(exist_ok=True)
-save(out / 'moon-light.gif', (0x19, 0x17, 0x14))   # ink on light mode
-save(out / 'moon-dark.gif', (0xF2, 0xF2, 0xF2))    # off-white on dark mode, like shreys.me
-print('wrote assets/moon-{light,dark}.gif')
+save(out / 'sky-light.gif', (0x19, 0x17, 0x14))   # ink on light mode
+save(out / 'sky-dark.gif', (0xF2, 0xF2, 0xF2))    # off-white on dark mode, like shreys.me
+print('wrote assets/sky-{light,dark}.gif')

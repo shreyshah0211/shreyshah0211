@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/moon-dark.gif">
-  <img src="./assets/moon-light.gif" width="416" alt="A small dithered moon turning among twinkling pixel stars, with a one-pixel satellite in orbit and the odd shooting star">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/sky-dark.gif">
+  <img src="./assets/sky-light.gif" width="416" alt="A small dithered moon turning among twinkling pixel stars, with a one-pixel satellite in orbit and the odd shooting star">
 </picture>
 
 # Shrey Shah
