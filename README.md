@@ -12,7 +12,3 @@
 [Website](https://shreys.me) · [Insights](https://shreys.me/insights/) · [LinkedIn](https://www.linkedin.com/in/shreyshah0211/)
 
 </div>
-
----
-
-<sub>Profile updated November 17, 2026 · [shreys.me](https://shreys.me)</sub>
