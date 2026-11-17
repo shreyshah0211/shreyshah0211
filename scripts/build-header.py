@@ -1,103 +1,83 @@
-"""Renders assets/intro.gif: the shreys.me intro as a pixel-art banner.
-Square pixel stars drift and twinkle into crosses while a terminal types
-"hi, i'm shrey." then "i think deeply about things.", then the stars scatter
-and the loop starts over. Everything sits on a 3px grid.
+"""Renders assets/moon-{light,dark}.gif: a small cratered moon turning once per
+loop, lit from the side, Bayer-dithered to 1-bit pixels, with a single pixel
+satellite in orbit. No text. Loops seamlessly.
 
     python3 scripts/build-header.py      # needs numpy + pillow
 """
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from pathlib import Path
 
-W, H, PX = 280, 72, 3                # logical pixels; each one is drawn 3x3
-MS = 70                              # ms per frame
-BG, INK = (14, 14, 14), (242, 242, 242)
-FONT = ImageFont.truetype('/System/Library/Fonts/Menlo.ttc', 10)
-PHRASES = ["hi, i'm shrey.", "i think deeply about things."]
-rng = np.random.default_rng(7)
+L, PX = 96, 2                  # 96x96 logical pixels, each drawn 2x2
+FRAMES, MS = 96, 90
+R = 0.62                       # moon radius in [-1, 1] space
+rng = np.random.default_rng(11)
 
-# ---- timeline: list of (text, cursor_on, phase) per frame -------------------
-tl = []
-def hold(text, n, phase='idle'):
-    for _ in range(n):
-        tl.append((text, phase))
-hold('', 8)
-for ch in range(1, len(PHRASES[0]) + 1): hold(PHRASES[0][:ch], 1)
-hold(PHRASES[0], 16)
-for ch in range(len(PHRASES[0]) - 1, -1, -2): hold(PHRASES[0][:max(ch, 0)], 1)
-hold('', 5)
-for ch in range(1, len(PHRASES[1]) + 1): hold(PHRASES[1][:ch], 1)
-hold(PHRASES[1], 22)
-EXPLODE_AT = len(tl)
-hold('', 14, 'explode')
-hold('', 6, 'dark')
-N = len(tl)
+BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16 + 1 / 32
+THR = np.tile(BAYER, (L // 4, L // 4))
 
-# ---- stars --------------------------------------------------------------------
-S = 70
-sx, sy = rng.uniform(0, W, S), rng.uniform(0, H, S)
-ang = rng.uniform(0, 2 * np.pi, S)
-spd = rng.uniform(0.03, 0.12, S)
-vx, vy = np.cos(ang) * spd, np.sin(ang) * spd
-big = rng.random(S) < 0.2
-cross = rng.random(S) < 0.08
-alpha = rng.uniform(0.12, 0.45, S)
-tw_at = rng.integers(0, N, S)                        # each star twinkles once a loop
-tw_on = rng.random(S) < 0.35
+u = (np.arange(L) + 0.5) / L * 2 - 1
+X, Y = np.meshgrid(u, -u)
+Z2 = R * R - X * X - Y * Y
+DISC = Z2 > 0
+Z = np.sqrt(np.clip(Z2, 0, None))
+N = np.stack([X, Y, Z], -1) / R                     # unit normals in view space
 
-cx, cy = W / 2, H / 2
+# craters: random spots on the sphere, a dark bowl with a bright rim
+K = 34
+C = rng.normal(size=(K, 3)); C /= np.linalg.norm(C, axis=1, keepdims=True)
+CR = rng.uniform(0.08, 0.32, K) ** 1.3
+# broad "maria": low-frequency dark patches
+M = rng.normal(size=(5, 3)); M /= np.linalg.norm(M, axis=1, keepdims=True)
 
-def shade(a):
-    return tuple(int(BG[i] + (INK[i] - BG[i]) * a) for i in range(3))
+LIGHT = np.array([-0.55, 0.35, 0.76]); LIGHT /= np.linalg.norm(LIGHT)
+TILT = np.radians(18)
 
-frames = []
-for f, (text, phase) in enumerate(tl):
-    im = Image.new('RGB', (W, H), BG)
-    d = ImageDraw.Draw(im)
-    d.fontmode = '1'                                 # hard pixel edges, no antialiasing
-    fade_in = min(1, f / 10)
-    for i in range(S):
-        x, y = sx[i] + vx[i] * f, sy[i] + vy[i] * f
-        a = alpha[i] * fade_in
-        if phase in ('explode', 'dark'):
-            k = f - EXPLODE_AT
-            dx, dy = x - cx, y - cy
-            dist = np.hypot(dx, dy) or 1
-            boost = 2.5 + 3 * (i % 5) / 4
-            x += dx / dist * boost * k
-            y += dy / dist * boost * k
-            a = max(0, alpha[i] - 0.05 * k)
-        x, y = x % W if phase == 'idle' else x, y % H if phase == 'idle' else y
-        if a <= 0 or not (0 <= x < W and 0 <= y < H):
-            continue
-        # twinkle: brighten in steps, flare a cross at the peak
-        t = (f - tw_at[i]) % N
-        flare = tw_on[i] and t < 8 and phase == 'idle'
-        if flare:
-            a = min(1, a + [0.2, 0.4, 0.6, 0.8, 0.8, 0.6, 0.4, 0.2][t])
-        ix, iy = int(x), int(y)
-        col = shade(a)
-        if cross[i] or (flare and 2 <= t <= 5):
-            d.point([(ix, iy), (ix - 1, iy), (ix + 1, iy), (ix, iy - 1), (ix, iy + 1)], fill=col)
-        elif big[i]:
-            d.rectangle([ix, iy, ix + 1, iy + 1], fill=col)
-        else:
-            d.point((ix, iy), fill=col)
 
-    # terminal line with a block cursor
-    full = text if phase == 'idle' else ''
-    tw = int(d.textlength(full, font=FONT))
-    total = int(d.textlength(PHRASES[1], font=FONT))
-    x0 = (W - tw - 5) // 2
-    ty = H // 2 - 6
-    if phase == 'idle':
-        d.text((x0, ty), full, font=FONT, fill=INK)
-        if (f // 7) % 2 == 0 or text not in PHRASES:   # solid while typing, blinks while holding
-            d.rectangle([x0 + tw + 1, ty + 1, x0 + tw + 5, ty + 11], fill=INK)
+def albedo(p):
+    a = np.full(p.shape[:-1], 0.82)
+    for m in M:
+        a -= 0.3 * np.clip((p @ m - 0.5) / 0.25, 0, 1)
+    for c, r in zip(C, CR):
+        ang = np.arccos(np.clip(p @ c, -1, 1))
+        q = ang / r
+        a -= 0.45 * np.clip(1 - q, 0, 1) ** 0.5 * (q < 1)
+        a += 0.25 * np.exp(-((q - 1.0) / 0.1) ** 2)
+    return np.clip(a, 0, 1)
 
-    frames.append(im.resize((W * PX, H * PX), Image.NEAREST).quantize(colors=24, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE))
+
+def frame(i):
+    th = 2 * np.pi * i / FRAMES
+    ct, st = np.cos(TILT), np.sin(TILT)
+    tilt = np.array([[1, 0, 0], [0, ct, -st], [0, st, ct]])
+    spin = np.array([[np.cos(th), 0, np.sin(th)], [0, 1, 0], [-np.sin(th), 0, np.cos(th)]])
+    body = N @ (tilt @ spin)                          # view normal -> surface point on the moon
+    lum = albedo(body) * (0.08 + 0.92 * np.clip(N @ LIGHT, 0, 1) ** 0.7)
+    lum = np.where(DISC, np.clip(lum * 1.15, 0, 0.97), 0)
+    ink = (lum > THR) & DISC
+    # one-pixel satellite on a tilted orbit, behind the moon for half the loop
+    a = 2 * np.pi * i / FRAMES * 2
+    sx, sy, sz = 0.88 * np.cos(a), 0.2 * np.sin(a), np.sin(a)
+    ix, iy = int((sx + 1) / 2 * L), int((1 - sy) / 2 * L)
+    hidden = sz < 0 and (sx * sx + sy * sy) < R * R
+    if not hidden and 0 <= ix < L and 0 <= iy < L:
+        ink[iy:iy + 2, ix:ix + 2] = True
+    return ink
+
+
+def save(path, fg):
+    frames = []
+    for i in range(FRAMES):
+        im = Image.fromarray(frame(i).astype(np.uint8)).convert('P')
+        im = im.resize((L * PX, L * PX), Image.NEAREST)
+        im.putpalette([0, 0, 0] + list(fg) + [0] * 762)
+        frames.append(im)
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=MS,
+                   loop=0, transparency=0, disposal=2, optimize=False)
+
 
 out = Path(__file__).resolve().parent.parent / 'assets'
 out.mkdir(exist_ok=True)
-frames[0].save(out / 'intro.gif', save_all=True, append_images=frames[1:], duration=MS, loop=0, optimize=True)
-print(f'wrote assets/intro.gif — {N} frames, {N * MS / 1000:.1f}s loop')
+save(out / 'moon-light.gif', (0x19, 0x17, 0x14))   # ink on light mode
+save(out / 'moon-dark.gif', (0xF2, 0xF2, 0xF2))    # off-white on dark mode, like shreys.me
+print('wrote assets/moon-{light,dark}.gif')

@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="./assets/intro.gif" width="840" alt="Pixel stars drifting while a terminal types: hi, i'm shrey. Then: i think deeply about things.">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/moon-dark.gif">
+  <img src="./assets/moon-light.gif" width="160" alt="A small dithered moon turning, with a one-pixel satellite in orbit">
+</picture>
 
 # Shrey Shah
 
