@@ -13,10 +13,7 @@
 
 </div>
 
-## Selected work
-
-| Project | What it does | Built with |
-| :--- | :--- | :--- |
+--- | :--- | :--- |
 | [Cue](https://www.speakwithcue.com/) | AI public-speaking coach with live feedback through custom smart glasses. 2026 Lavin Showcase winner. | Node.js, NLP, real-time A/V |
 | [Sutra](https://github.com/shreyshah0211/Sutra) · [GeekWire](https://www.geekwire.com/2025/drone-startup-surveying-power-lines-to-prevent-fires-wins-top-prize-at-prestigious-uw-competition/) | Medical training through realistic patient simulations. Dempsey Startup Competition Sweet 16. | Python, Flask, OpenAI |
 | [cookinUp](https://github.com/shreyshah0211/cookinUp) · [Devpost](https://devpost.com/software/cookinup) | A pixel-art kitchen that visualizes multi-agent AI, with live token costs. Built at DubHacks 2026. | Next.js, TypeScript, Claude API |
