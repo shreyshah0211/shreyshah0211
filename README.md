@@ -1,9 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/star-dark.gif">
-  <img src="./assets/star-light.gif" width="181" alt="A dithered star that blinks">
-</picture>
+<img src="./assets/intro.gif" width="840" alt="Pixel stars drifting while a terminal types: hi, i'm shrey. Then: i think deeply about things.">
 
 # Shrey Shah
 
@@ -22,12 +19,6 @@
 | [cookinUp](https://github.com/shreyshah0211/cookinUp) · [Devpost](https://devpost.com/software/cookinup) | A pixel-art kitchen that visualizes multi-agent AI, with live token costs. Built at DubHacks 2026. | Next.js, TypeScript, Claude API |
 | [Vera](https://github.com/shreyshah0211/Vera) | AI assistant that makes phone calls for you and sends a transcript after. | Python, Twilio, ElevenLabs |
 | [Lock In](https://github.com/shreyshah0211/lock-in) | Social gym-streak app: post a gym photo every 48 hours to keep your streak. | JavaScript |
-
-## What I build with
-
-Python · TypeScript · JavaScript · Java · SQL<br>
-Next.js · React · Node.js · Flask · PyTorch · Isaac Sim<br>
-ESP32 · Onshape · OpenAI / Claude APIs · MCP
 
 ---
 

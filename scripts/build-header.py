@@ -1,75 +1,103 @@
-"""Renders assets/star-{light,dark}.gif: a 1-bit Bayer-dithered beveled star
-that blinks, with a soft dithered glow. Pure NumPy + Pillow.
+"""Renders assets/intro.gif: the shreys.me intro as a pixel-art banner.
+Square pixel stars drift and twinkle into crosses while a terminal types
+"hi, i'm shrey." then "i think deeply about things.", then the stars scatter
+and the loop starts over. Everything sits on a 3px grid.
 
     python3 scripts/build-header.py      # needs numpy + pillow
 """
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 
-SIZE, FRAMES, MS = 200, 40, 60
-OUTER, INNER = 0.78, 0.33          # star tip radius and notch radius
+W, H, PX = 280, 72, 3                # logical pixels; each one is drawn 3x3
+MS = 70                              # ms per frame
+BG, INK = (14, 14, 14), (242, 242, 242)
+FONT = ImageFont.truetype('/System/Library/Fonts/Menlo.ttc', 10)
+PHRASES = ["hi, i'm shrey.", "i think deeply about things."]
+rng = np.random.default_rng(7)
 
-BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16 + 1 / 32
-THR = np.tile(BAYER, (SIZE // 4 + 1, SIZE // 4 + 1))[:SIZE, :SIZE]
+# ---- timeline: list of (text, cursor_on, phase) per frame -------------------
+tl = []
+def hold(text, n, phase='idle'):
+    for _ in range(n):
+        tl.append((text, phase))
+hold('', 8)
+for ch in range(1, len(PHRASES[0]) + 1): hold(PHRASES[0][:ch], 1)
+hold(PHRASES[0], 16)
+for ch in range(len(PHRASES[0]) - 1, -1, -2): hold(PHRASES[0][:max(ch, 0)], 1)
+hold('', 5)
+for ch in range(1, len(PHRASES[1]) + 1): hold(PHRASES[1][:ch], 1)
+hold(PHRASES[1], 22)
+EXPLODE_AT = len(tl)
+hold('', 14, 'explode')
+hold('', 6, 'dark')
+N = len(tl)
 
-u = np.linspace(-1, 1, SIZE)
-X, Y = np.meshgrid(u, -u)
-R = np.hypot(X, Y)
-TH = np.arctan2(X, Y) % (2 * np.pi)          # 0 = straight up
+# ---- stars --------------------------------------------------------------------
+S = 70
+sx, sy = rng.uniform(0, W, S), rng.uniform(0, H, S)
+ang = rng.uniform(0, 2 * np.pi, S)
+spd = rng.uniform(0.03, 0.12, S)
+vx, vy = np.cos(ang) * spd, np.sin(ang) * spd
+big = rng.random(S) < 0.2
+cross = rng.random(S) < 0.08
+alpha = rng.uniform(0.12, 0.45, S)
+tw_at = rng.integers(0, N, S)                        # each star twinkles once a loop
+tw_on = rng.random(S) < 0.35
 
-# Star edge radius at each angle: a polygon through 5 tips and 5 notches.
-seg = 2 * np.pi / 10
-k = np.floor(TH / seg).astype(int)
-f = TH / seg - k
-a0, a1 = k * seg, (k + 1) * seg
-r0 = np.where(k % 2 == 0, OUTER, INNER)
-r1 = np.where(k % 2 == 0, INNER, OUTER)
-p0 = np.stack([r0 * np.sin(a0), r0 * np.cos(a0)], -1)
-p1 = np.stack([r1 * np.sin(a1), r1 * np.cos(a1)], -1)
-d = p1 - p0
-# where the ray from the center at angle TH crosses segment p0-p1
-dirv = np.stack([np.sin(TH), np.cos(TH)], -1)
-cross = lambda a, b: a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
-EDGE = cross(p0, d) / cross(dirv, d)
-INSIDE = R <= EDGE
+cx, cy = W / 2, H / 2
 
-# Bevel: each of the 10 wedges is a facet, lit from the upper left.
-# Facets on the left of a tip catch the light; facets on the right fall in shade.
-mid = (k + 0.5) * seg
-light_dir = np.radians(315)
-FACET = 0.55 + 0.45 * np.cos(mid - light_dir) * np.where(k % 2 == 0, 1.0, 0.6)
-FACET = np.clip(FACET + 0.25 * (1 - R / np.maximum(EDGE, 1e-6)), 0, 1)   # brighter toward the center
+def shade(a):
+    return tuple(int(BG[i] + (INK[i] - BG[i]) * a) for i in range(3))
 
+frames = []
+for f, (text, phase) in enumerate(tl):
+    im = Image.new('RGB', (W, H), BG)
+    d = ImageDraw.Draw(im)
+    d.fontmode = '1'                                 # hard pixel edges, no antialiasing
+    fade_in = min(1, f / 10)
+    for i in range(S):
+        x, y = sx[i] + vx[i] * f, sy[i] + vy[i] * f
+        a = alpha[i] * fade_in
+        if phase in ('explode', 'dark'):
+            k = f - EXPLODE_AT
+            dx, dy = x - cx, y - cy
+            dist = np.hypot(dx, dy) or 1
+            boost = 2.5 + 3 * (i % 5) / 4
+            x += dx / dist * boost * k
+            y += dy / dist * boost * k
+            a = max(0, alpha[i] - 0.05 * k)
+        x, y = x % W if phase == 'idle' else x, y % H if phase == 'idle' else y
+        if a <= 0 or not (0 <= x < W and 0 <= y < H):
+            continue
+        # twinkle: brighten in steps, flare a cross at the peak
+        t = (f - tw_at[i]) % N
+        flare = tw_on[i] and t < 8 and phase == 'idle'
+        if flare:
+            a = min(1, a + [0.2, 0.4, 0.6, 0.8, 0.8, 0.6, 0.4, 0.2][t])
+        ix, iy = int(x), int(y)
+        col = shade(a)
+        if cross[i] or (flare and 2 <= t <= 5):
+            d.point([(ix, iy), (ix - 1, iy), (ix + 1, iy), (ix, iy - 1), (ix, iy + 1)], fill=col)
+        elif big[i]:
+            d.rectangle([ix, iy, ix + 1, iy + 1], fill=col)
+        else:
+            d.point((ix, iy), fill=col)
 
-def frame(i):
-    t = i / FRAMES
-    # Mostly steady, then a quick bright blink and a gentle dip after it.
-    blink = np.exp(-((t - 0.5) / 0.06) ** 2)
-    level = 0.62 + 0.38 * blink - 0.12 * np.exp(-((t - 0.68) / 0.07) ** 2)
-    scale = 0.9 + 0.1 * blink
-    rr = R / scale
-    inside = rr <= EDGE
-    star = np.where(inside, np.clip(FACET * (0.55 + 0.6 * level), 0, 0.97), 0)
-    glow = (0.06 + 0.55 * blink) * np.exp(-((rr - 0.25) / 0.38) ** 2) * (~inside)
-    # thin sparkle rays on the blink
-    rays = blink * 0.9 * (np.exp(-(X / 0.012) ** 2) + np.exp(-(Y / 0.012) ** 2)) * np.exp(-R / 0.5) * (~inside)
-    lum = np.clip(star + glow + rays, 0, 0.97)
-    return lum > THR
+    # terminal line with a block cursor
+    full = text if phase == 'idle' else ''
+    tw = int(d.textlength(full, font=FONT))
+    total = int(d.textlength(PHRASES[1], font=FONT))
+    x0 = (W - tw - 5) // 2
+    ty = H // 2 - 6
+    if phase == 'idle':
+        d.text((x0, ty), full, font=FONT, fill=INK)
+        if (f // 7) % 2 == 0 or text not in PHRASES:   # solid while typing, blinks while holding
+            d.rectangle([x0 + tw + 1, ty + 1, x0 + tw + 5, ty + 11], fill=INK)
 
-
-def save(path, fg):
-    frames = []
-    for i in range(FRAMES):
-        im = Image.fromarray(frame(i).astype(np.uint8)).convert('P')
-        im.putpalette([0, 0, 0] + list(fg) + [0] * 762)
-        frames.append(im)
-    frames[0].save(path, save_all=True, append_images=frames[1:], duration=MS,
-                   loop=0, transparency=0, disposal=2, optimize=False)
-
+    frames.append(im.resize((W * PX, H * PX), Image.NEAREST).quantize(colors=24, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE))
 
 out = Path(__file__).resolve().parent.parent / 'assets'
 out.mkdir(exist_ok=True)
-save(out / 'star-light.gif', (0x1E, 0x3F, 0xD8))   # cobalt on light
-save(out / 'star-dark.gif', (0x5B, 0x78, 0xFF))    # brighter cobalt on dark
-print('wrote assets/star-{light,dark}.gif')
+frames[0].save(out / 'intro.gif', save_all=True, append_images=frames[1:], duration=MS, loop=0, optimize=True)
+print(f'wrote assets/intro.gif — {N} frames, {N * MS / 1000:.1f}s loop')
